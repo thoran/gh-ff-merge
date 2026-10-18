@@ -1,0 +1,8 @@
+# CHANGELOG
+
+## 20261018
+
+0.0.0: Merge a branch's open pull request by fast-forwarding its base branch and pushing it.
+
+1. + bin/git-ff-merge-pr: the pull request for the current branch from gh pr view; stops where there is no remote called origin, where there is no open pull request, where the branch isn't its head, or where the base branch has moved on or has commits of its own; otherwise fast-forwards the base branch and pushes it.
+2. + README.md, LICENSE, Gemfile, .gitignore, CHANGELOG
