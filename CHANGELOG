@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 20261019
+
+0.1.0: + -d, --delete-branch: delete the branch, locally and on origin, once merged.
+
+1. + bin/git-ff-merge-pr: usage(), switches(), -d and -h.
+2. + bin/git-ff-merge-pr: delete_branch(): stops where origin's base branch doesn't hold the branch's head commit, or where GitHub hasn't marked the pull request merged within 20 seconds; deletes the branch on origin where it is still there, then the local branch with git branch -d.
+3. ~ Gemfile: + switches.rb
+4. ~ README.md: + -d.
+
 ## 20261018
 
 0.0.0: Merge a branch's open pull request by fast-forwarding its base branch and pushing it.

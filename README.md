@@ -41,10 +41,19 @@ It stops, pushing nothing, where:
 
 Each time it says what to do about it.
 
+To delete the branch as well, locally and on origin, once it is merged:
+
+```shell
+$ git ff-merge-pr -d
+```
+
+Before deleting anything it checks that origin's base branch holds the branch's head commit, and waits for GitHub to mark the pull request merged, since deleting the head branch before then can leave the pull request closed rather than merged. Where either check fails, it keeps the branch. Where the branch on origin is already gone, as when GitHub deletes head branches itself, it deletes only the local branch.
+
 ## Notes
 
 1. It fetches from, and pushes to, the remote called origin.
 2. The base branch is the pull request's, which is usually, but not necessarily, the default branch.
+3. The local branch is deleted with `git branch -d`, so git refuses where it holds anything the base branch doesn't.
 
 ## Contributing
 

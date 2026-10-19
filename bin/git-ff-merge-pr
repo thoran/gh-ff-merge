@@ -1,13 +1,15 @@
 #!/usr/bin/env ruby
 # git-ff-merge-pr
 
-# 20261018
-# 0.0.0
+# 20261019
+# 0.1.0
 
 # Usage:
 # 1. On a branch with an open pull request:
 #  `git ff-merge-pr`
 #   It fast-forwards the pull request's base branch to the branch and pushes it, and GitHub then marks the pull request merged.
+# 2. To delete the branch as well, locally and on origin, once merged:
+#  `git ff-merge-pr -d`
 
 # Notes:
 # 1. Fast-forward only, so that the commits on the base branch are the ones which were pushed, signatures and all. Where it cannot fast-forward, it stops without pushing.
@@ -15,10 +17,35 @@
 # 3. Assumes that the remote is called origin.
 
 gem 'git.rb'
+gem 'switches.rb'
 
 require 'Git/Branch'
 require 'Git/Remote'
 require 'json'
+require 'switches.rb'
+
+MERGED_CHECKS = 10
+MERGED_CHECK_INTERVAL = 2
+
+def usage
+  puts "git-ff-merge-pr - Merge a branch's open pull request by fast-forwarding its base branch and pushing it."
+  puts
+  puts "Usage: git ff-merge-pr [options]"
+  puts
+  puts "Options:"
+  puts "  -d, --delete-branch  Delete the branch, locally and on origin, once merged"
+  puts "  -h, --help           Show this help"
+end
+
+def switches
+  @switches ||= Switches.new do |s|
+    s.boolean(:d, :delete_branch){'Delete the branch, locally and on origin, once merged'}
+    s.perform(:h, :help?) do
+      usage
+      exit
+    end
+  end
+end
 
 def validate_origin
   abort "There is no remote called origin." unless Git::Remote.exist?('origin')
@@ -77,7 +104,55 @@ def fast_forward_base_branch
   MESSAGE
 end
 
+def on_base_branch?
+  system("git fetch origin #{base_branch}") &&
+    system("git merge-base --is-ancestor #{branch_commit} origin/#{base_branch}")
+end
+
+def validate_on_base_branch
+  abort "origin/#{base_branch} doesn't hold #{branch}, so #{branch} is kept." unless on_base_branch?
+end
+
+def pull_request_state
+  `gh pr view #{pull_request['url']} --json state --jq .state`.strip
+end
+
+def merged?
+  MERGED_CHECKS.times.any? do |check|
+    sleep MERGED_CHECK_INTERVAL unless check.zero?
+    pull_request_state == 'MERGED'
+  end
+end
+
+def validate_merged
+  abort <<~MESSAGE unless merged?
+    GitHub hasn't yet marked #{pull_request['url']} merged, so #{branch} is kept. Once it has:
+      git push origin --delete #{branch}
+      git branch -d #{branch}
+  MESSAGE
+end
+
+def remote_branch_exist?
+  system("git ls-remote --exit-code --heads origin refs/heads/#{branch}", out: File::NULL)
+end
+
+def delete_remote_branch
+  run!("git push origin --delete #{branch}") if remote_branch_exist?
+end
+
+def delete_local_branch
+  run!("git branch -d #{branch}")
+end
+
+def delete_branch
+  validate_on_base_branch
+  validate_merged
+  delete_remote_branch
+  delete_local_branch
+end
+
 def main
+  switches
   validate_origin
   run!('git fetch origin')
   validate_pull_request
@@ -85,6 +160,7 @@ def main
   fast_forward_base_branch
   run!("git push origin #{base_branch}")
   puts "Merged #{pull_request['url']}"
+  delete_branch if switches.delete_branch?
 end
 
 main
