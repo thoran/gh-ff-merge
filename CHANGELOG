@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 20261021
+
+0.2.0: /git-ff-merge-pr/gh-ff-merge/: the GitHub tool, run as gh ff-merge, taking the same command line as git-ff-merge.
+
+1. /bin/git-ff-merge-pr/gh-ff-merge/: at the root, where gh extension install looks for it.
+2. + gh-ff-merge: [<base-branch>]: stops where the base branch named isn't the pull request's; and usage() where more are given.
+3. ~ gh-ff-merge: branch(): from git symbolic-ref, stopping upon 'Not on a branch.' on a detached HEAD, where Git::Branch.current gave a name which wasn't one.
+4. ~ gh-ff-merge: usage, messages and header say gh ff-merge.
+5. + test/gh-ff-merge_test.rb
+6. ~ README.md: as the GitHub tool, with git-ff-merge as its sibling for any host; + gh extension install.
+
 ## 20261019
 
 0.1.0: + -d, --delete-branch: delete the branch, locally and on origin, once merged.

@@ -1,15 +1,17 @@
 #!/usr/bin/env ruby
-# git-ff-merge-pr
+# gh-ff-merge
 
-# 20261019
-# 0.1.0
+# 20261021
+# 0.2.0
 
 # Usage:
 # 1. On a branch with an open pull request:
-#  `git ff-merge-pr`
+#  `gh ff-merge`
 #   It fast-forwards the pull request's base branch to the branch and pushes it, and GitHub then marks the pull request merged.
-# 2. To delete the branch as well, locally and on origin, once merged:
-#  `git ff-merge-pr -d`
+# 2. To check the base branch as well, stopping where it isn't the pull request's:
+#  `gh ff-merge <base-branch>`
+# 3. To delete the branch as well, locally and on origin, once merged:
+#  `gh ff-merge -d`
 
 # Notes:
 # 1. Fast-forward only, so that the commits on the base branch are the ones which were pushed, signatures and all. Where it cannot fast-forward, it stops without pushing.
@@ -19,7 +21,6 @@
 gem 'git.rb'
 gem 'switches.rb'
 
-require 'Git/Branch'
 require 'Git/Remote'
 require 'json'
 require 'switches.rb'
@@ -28,9 +29,11 @@ MERGED_CHECKS = 10
 MERGED_CHECK_INTERVAL = 2
 
 def usage
-  puts "git-ff-merge-pr - Merge a branch's open pull request by fast-forwarding its base branch and pushing it."
+  puts "gh-ff-merge - Merge a branch's open pull request by fast-forwarding its base branch and pushing it."
   puts
-  puts "Usage: git ff-merge-pr [options]"
+  puts "Usage: gh ff-merge [options] [<base-branch>]"
+  puts
+  puts "The base branch is the pull request's. Where one is given and it isn't the pull request's, it stops."
   puts
   puts "Options:"
   puts "  -d, --delete-branch  Delete the branch, locally and on origin, once merged"
@@ -47,6 +50,13 @@ def switches
   end
 end
 
+def validate_args
+  if ARGV.length > 1
+    usage
+    exit 1
+  end
+end
+
 def validate_origin
   abort "There is no remote called origin." unless Git::Remote.exist?('origin')
 end
@@ -56,7 +66,11 @@ def run!(command)
 end
 
 def branch
-  @branch ||= Git::Branch.current.name
+  @branch ||= `git symbolic-ref --quiet --short HEAD`.strip
+end
+
+def validate_branch
+  abort "Not on a branch. Check out the branch to merge." if branch.empty?
 end
 
 def pull_request
@@ -70,12 +84,20 @@ def base_branch
   pull_request['baseRefName']
 end
 
+def named_base_branch
+  ARGV.first
+end
+
 def branch_commit
   `git rev-parse #{branch}`.strip
 end
 
 def open_pull_request?
   pull_request && pull_request['state'] == 'OPEN'
+end
+
+def named_base_branch_matches?
+  named_base_branch.nil? || named_base_branch == base_branch
 end
 
 def pushed?
@@ -88,9 +110,10 @@ end
 
 def validate_pull_request
   abort "#{branch} has no open pull request." unless open_pull_request?
-  abort "#{branch} is not the pull request's head. Push it, then run `git ff-merge-pr` again." unless pushed?
+  abort "#{named_base_branch} isn't the base branch of #{pull_request['url']}, which is #{base_branch}." unless named_base_branch_matches?
+  abort "#{branch} is not the pull request's head. Push it, then run `gh ff-merge` again." unless pushed?
   abort <<~MESSAGE unless fast_forwardable?
-    #{base_branch} has moved on since #{branch} was cut. Rebase it and push it, then run `git ff-merge-pr` again:
+    #{base_branch} has moved on since #{branch} was cut. Rebase it and push it, then run `gh ff-merge` again:
       git rebase origin/#{base_branch}
       git push --force-with-lease
   MESSAGE
@@ -153,7 +176,9 @@ end
 
 def main
   switches
+  validate_args
   validate_origin
+  validate_branch
   run!('git fetch origin')
   validate_pull_request
   run!("git checkout #{base_branch}")
