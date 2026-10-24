@@ -1,14 +1,15 @@
 # test/gh-ff-merge_test.rb
 
-# 20261021
-# 0.2.0
+# 20261024
+# 0.2.1
 
 # Each test runs gh-ff-merge as a subprocess in a clone of a bare repository
 # made for the purpose, standing in for origin, with a fake gh first on the
 # path, and asserts upon where the branches on origin and in the clone end up.
 # The fake gh answers `gh pr view` from pull_request.json, and with --jq,
 # from states, a state a line, taken in turn and the last repeating; where
-# pull_request.json is absent it fails, as gh does with no pull request.
+# pull_request.json is absent it fails, as gh does with no pull request. Each
+# call is written to calls, a call a line.
 
 require 'json'
 require 'minitest/autorun'
@@ -21,6 +22,7 @@ URL = 'https://github.com/thoran/example/pull/1'
 FAKE_GH = <<~'RUBY'
   #!/usr/bin/env ruby
   directory = File.dirname(__FILE__)
+  File.write(File.join(directory, 'calls'), "#{ARGV.join(' ')}\n", mode: 'a')
   pull_request = File.join(directory, 'pull_request.json')
   exit 1 unless File.exist?(pull_request)
   if ARGV.include?('--jq')
@@ -68,6 +70,12 @@ def pull_request(state: 'OPEN', base: 'master', head: sha('HEAD'), states: ['MER
   File.write(File.join(fake_gh_directory, 'pull_request.json'), JSON.generate(state: state, baseRefName: base, headRefOid: head, url: URL))
   File.write(File.join(fake_gh_directory, 'states'), states.join("\n"))
 end
+
+def gh_calls
+  calls = File.join(fake_gh_directory, 'calls')
+  File.exist?(calls) ? File.readlines(calls, chomp: true) : []
+end
+
 
 def in_clone
   Dir.mktmpdir do |directory|
@@ -283,6 +291,60 @@ describe 'gh-ff-merge' do
         _(origin_sha('master')).must_equal fix
         _(origin_sha('fix')).must_equal fix
         _(sha('refs/heads/fix')).must_equal fix
+      end
+    end
+  end
+  describe 'given an option' do
+    def mergeable
+      branch_from('master', 'fix', 'the fix')
+      git('push', 'origin', 'fix')
+      pull_request
+    end
+
+    def must_be_untouched(fix)
+      _(gh_calls).must_be_empty
+      _(File.exist?('.git/FETCH_HEAD')).must_equal false
+      _(origin_sha('master')).wont_equal fix
+      _(origin_sha('fix')).must_equal fix
+      _(sha('refs/heads/fix')).must_equal fix
+      _(`git symbolic-ref --short HEAD`.strip).must_equal 'fix'
+    end
+
+    ['-h', '--help'].each do |option|
+      it "shows usage for #{option}, touching nothing" do
+        in_clone do
+          mergeable
+          fix = sha('fix')
+          status, output = ff_merge(option)
+          _(status).must_equal 0
+          _(output).must_include 'Usage: gh ff-merge'
+          must_be_untouched(fix)
+        end
+      end
+
+      it "shows usage for -d #{option}, touching nothing" do
+        in_clone do
+          mergeable
+          fix = sha('fix')
+          status, output = ff_merge('-d', option)
+          _(status).must_equal 0
+          _(output).must_include 'Usage: gh ff-merge'
+          must_be_untouched(fix)
+        end
+      end
+    end
+
+    [['--version'], ['--bogus'], ['-x'], ['-dx'], ['-d', '--bogus'], ['--bogus', '-h'], ['--delete-branch=yes'], ['--del'], ['--', '--bogus'], ['-'], ['master', '--bogus']].each do |arguments|
+      it "stops upon #{arguments.join(' ')}, touching nothing" do
+        in_clone do
+          mergeable
+          fix = sha('fix')
+          status, output = ff_merge(*arguments)
+          _(status).must_equal 1
+          _(output).must_include 'Unknown option: '
+          _(output).must_include 'Usage: gh ff-merge'
+          must_be_untouched(fix)
+        end
       end
     end
   end

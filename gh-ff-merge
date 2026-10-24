@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 # gh-ff-merge
 
-# 20261021
-# 0.2.0
+# 20261024
+# 0.2.1
 
 # Usage:
 # 1. On a branch with an open pull request:
@@ -27,6 +27,7 @@ require 'switches.rb'
 
 MERGED_CHECKS = 10
 MERGED_CHECK_INTERVAL = 2
+OPTIONS = %w{-d --delete-branch -h --help}
 
 def usage
   puts "gh-ff-merge - Merge a branch's open pull request by fast-forwarding its base branch and pushing it."
@@ -38,6 +39,14 @@ def usage
   puts "Options:"
   puts "  -d, --delete-branch  Delete the branch, locally and on origin, once merged"
   puts "  -h, --help           Show this help"
+end
+
+def validate_options
+  if option = ARGV.find{|argument| argument.start_with?('-') && !OPTIONS.include?(argument)}
+    warn "Unknown option: #{option}"
+    usage
+    exit 1
+  end
 end
 
 def switches
@@ -175,6 +184,7 @@ def delete_branch
 end
 
 def main
+  validate_options
   switches
   validate_args
   validate_origin

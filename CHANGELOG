@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 20261024
+
+0.2.1: + validate_options(): an argument beginning with - which isn't -d, --delete-branch, -h or --help stops upon 'Unknown option' and usage before git or gh is run.
+
+1. + gh-ff-merge: OPTIONS, validate_options(), called first in main(). An unknown option ended upon a backtrace, and - or anything after -- was passed on as the base branch, after the fetch and gh pr view.
+2. + test/gh-ff-merge_test.rb: -h and --help, alone and after -d, show usage and exit 0; unknown options, abbreviations, -- and - exit 1; in each, gh isn't called, nothing is fetched, and no branch moves.
+3. ~ test/gh-ff-merge_test.rb: the fake gh writes each call to calls; + gh_calls().
+
 ## 20261021
 
 0.2.0: /git-ff-merge-pr/gh-ff-merge/: the GitHub tool, run as gh ff-merge, taking the same command line as git-ff-merge.
